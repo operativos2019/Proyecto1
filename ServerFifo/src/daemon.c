@@ -33,22 +33,20 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-
-//SOBRE EL SERVER
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 
-//SOBRE EL SERVER
 static int running = 0;
 static int delay = 1;
-static int counter = 0;
 static char *conf_file_name = NULL;
 static char *pid_file_name = NULL;
 static int pid_fd = -1;
 static char *app_name = NULL;
 static FILE *log_stream;
+static char *timestamp;
 
-//SOBRE EL ARCHIVO DE CONFIG
+//Config file
 #define CONFIG_FILE_DIR "/etc/webserver"
 #define CONFIG_FILE_PATH "/etc/webserver/config.conf"
 #define CONFIG_FILE_DEFAULT_PORT "PORT=8001"
@@ -153,7 +151,7 @@ static void daemonize()
     }
 }
 
-//METODOS DEL ARCHIVO COMIENZAN ACA
+//CONFIG FILE METHODS BEGIN
 /*
  * En caso de que el directorio especificado exista
  * de lo contrario lo crea
@@ -171,8 +169,7 @@ void verifyConfigDir()
 }
 
 /*
- * Funcion que verifica que el archivo de configuracion exista
- * en caso contrario lo crea
+ * Verifies that the file exist otherwise it is created
  */
 void createConfigFile()
 {
@@ -199,8 +196,7 @@ void createConfigFile()
 }
 
 /*
- *  Funcion que retorna el puerto especificado en el archivo de configuracion
- *  si no lo encuentra retorna NULL
+ *  Returns the specified port otherwise returns null
  */
 int *getPortFromConfigFile()
 {
@@ -217,7 +213,7 @@ int *getPortFromConfigFile()
 
     if (file == NULL)
     {
-        printf("No fue posible leer el archivo de configuración\n");
+        perror("Configuration file is not readable\n");
         exit(EXIT_FAILURE);
     }
 
@@ -234,7 +230,7 @@ int *getPortFromConfigFile()
 
     if ((port != NULL) && (*port == '\0'))
     {
-        printf("No se encontró el puerto en el archivo de configuración\n");
+        perror("Port not found on config file\n");
         return NULL;
     }
 
@@ -256,7 +252,7 @@ char *getLogPathFromConfigFile()
 
     if (file == NULL)
     {
-        printf("No fue posible leer el archivo de configuración\n");
+        perror("Config file not readable\n");
         return NULL;
     }
 
@@ -273,7 +269,7 @@ char *getLogPathFromConfigFile()
 
     if ((logFilePath != NULL) && (logFilePath[0] == '\0'))
     {
-        printf("No se encontró el logfile path en el archivo de configuración\n");
+        perror("Logfile path not found on config file\n");
         return NULL;
     }
 
@@ -281,20 +277,53 @@ char *getLogPathFromConfigFile()
 
     return logFilePath;
 }
-//METODOS DEL ARCHIVO TERMINAN ACA
+//CONFIG FILE METHODS END
 
-//METODOS DEL SERVER COMIENZAN ACA
+/**
+ * Returns the time stamp on local time
+ * */
+void stamp()
+{
+    time_t currentTime = time(NULL);
+    time_t error = (time_t)-1;
+    if (currentTime == error)
+    {
+        timestamp = "UNAVAILABLE";
+    }
+    else
+    {
+        timestamp = ctime(&currentTime);
+        if (timestamp == NULL)
+        {
+            timestamp == "UNAVAILABLE";
+        }
+        else
+        {
+            int len = strlen(timestamp);
+            timestamp[len - 1] = '\0';
+        }
+    }
+}
 
+//SERVER METHODS BEGIN
+
+/**
+ * Debugin method made to test what the chunk being sent to the server contains
+ * 
+ * */
 void printError(const char *error, int size)
 {
+    stamp();
+    fprintf(log_stream, "%s:Message:\n", timestamp);
     for (int i = 0; i < size; i++)
     {
         if (error[i] != '\r')
         {
-            printf("%c", error[i]);
+            fprintf(log_stream, "%c", error[i]);
         }
     }
-    printf("\n");
+    stamp();
+    fprintf(log_stream, "\n%s:End of message", timestamp);
 }
 
 /**
@@ -305,12 +334,13 @@ void printError(const char *error, int size)
  * */
 int sendResponse(int socket, const char *message, const char *header, int nread)
 {
-    //printError(message, nread);
+
     int actuallyWrote;
     char *response;
     if (header != NO_HEADER)
     {
-
+        stamp();
+        fprintf(log_stream, "%s:Sending response to client\n", timestamp);
         response = (char *)malloc(nread + strlen(header));
         memcpy(response, header, strlen(header));
         memcpy(response + strlen(header), message, nread);
@@ -319,30 +349,25 @@ int sendResponse(int socket, const char *message, const char *header, int nread)
     }
     else
     {
+        stamp();
+        fprintf(log_stream, "%s:Sending chunk to client\n", timestamp);
         actuallyWrote = write(socket, message, nread);
     }
     if (actuallyWrote == -1)
     {
-        fprintf(log_stream, "nread %d\n", nread);
-        fprintf(log_stream, "MESSAGE:\n");
-        for (int i = 0; i < nread; i++)
-        {
-            fprintf(log_stream, "%c", message[i]);
-        }
+        stamp();
+        fprintf(log_stream, "%s:Error while sending data from the server\n", timestamp);
         return 0;
-        perror("error writing");
     }
-    else
-    {
-        return 1;
-    }
+    stamp();
+    fprintf(log_stream, "%s:Data sent succesfully\n", timestamp);
+    return 1;
 }
-//METODOS DEL SERVER TERMINAN ACA
+//SERVER METHODS END
 
 /* Main function */
 int main(int argc, char **argv, char **envp)
 {
-    int counter = 0;
     char *logFilePath;
 
     logFilePath = NULL;
@@ -399,10 +424,10 @@ int main(int argc, char **argv, char **envp)
         exiting = 0;
     }
 
-    if (exiting == 0)
+    if (exiting != 1)
     {
 
-        printf("Try again later\n");
+        perror("Try again later\n");
         return -1;
     }
     int nextSocket; //socket that will be used in each acceptance of a request
@@ -430,8 +455,8 @@ int main(int argc, char **argv, char **envp)
     {
 
         /* Debug print */
-
-        int ret = fprintf(log_stream, "Debug: %d\n", counter++);
+        stamp();
+        int ret = fprintf(log_stream, "%s:Waiting for next item\n", timestamp);
         if (ret < 0)
         {
             syslog(LOG_ERR, "Can not write to log stream: %s, error: %s",
@@ -445,15 +470,13 @@ int main(int argc, char **argv, char **envp)
                    (log_stream == stdout) ? "stdout" : logFilePath, strerror(errno));
             break;
         }
-
-        exiting = 1;
-        fprintf(log_stream, "Waiting... %d\n", counter);
         //Accepts the next item in the queue
         errorNo = (nextSocket = accept(fileDescriptor, (struct sockaddr *)&socketAddress, &address_len));
         if (errorNo == -1)
         {
-            perror("Error while accepting next item on the queue");
-            exiting = -1;
+            stamp();
+            fprintf(log_stream, "%s:Error while accepting next item on the queue\n", timestamp);
+            exiting = 0;
         }
 
         else //accepted correctly
@@ -472,7 +495,8 @@ int main(int argc, char **argv, char **envp)
             else
             {
                 /*********************  Getting the request ****************/
-                fprintf(log_stream, "Reading the request... %d\n", counter++);
+                stamp();
+                fprintf(log_stream, "%s:Reading the request from the client\n", timestamp);
 
                 const char *begin = "GET /";
                 const char *end = " HTTP";
@@ -493,20 +517,21 @@ int main(int argc, char **argv, char **envp)
                 }
                 if (requestString == NULL || requestString == "\0")
                 {
-                    perror("Error while reading request");
+                    stamp();
+                    fprintf(log_stream, "%s:Error while reading the request\n", timestamp);
                     httpHeader = HTTP_BAD_REQUEST;
                     sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
                 }
                 else
                 {
-
                     requestBody = (char *)malloc(sizeof(requestString) * strlen(requestString) + strlen(PATH) * sizeof(PATH));
                     sprintf(requestBody, "%s%s", PATH, requestString);
                     //***check if file can be found****//
                     if (access(requestBody, R_OK) == -1)
                     {
                         free(requestBody);
-                        perror("File does not exists or permissions are not granted");
+                        stamp();
+                        fprintf(log_stream, "%s:File does not exists or permissions are not granted\n", timestamp);
                         httpHeader = HTTP_NOT_FOUND;
                         sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
                     }
@@ -525,7 +550,7 @@ int main(int argc, char **argv, char **envp)
                             /*Sets up the header*/
                             httpHeader = HTTP_OK;
                             exiting = sendResponse(nextSocket, message, httpHeader, nread);
-                            free(message);     
+                            free(message);
                         }
                         else
                         {
@@ -540,18 +565,24 @@ int main(int argc, char **argv, char **envp)
                                 //each rn sizes 3
                                 long unsigned int hexLen = strlen(hexChunk);
                                 long unsigned int firstRN = hexLen + 2;
-                                fprintf(log_stream, "Chunk size hex: %s\n", hexChunk);
                                 message = (char *)malloc(firstRN + messageSize + 2);
-                                memcpy(message, hexChunk, hexLen); 
+                                memcpy(message, hexChunk, hexLen);
                                 memcpy(message + hexLen, "\r\n", 2);
                                 nread = fread(message + firstRN, 1, messageSize, f);
                                 if (nread < messageSize)
                                 {
-                                    fprintf(log_stream, "Chunk bytes read are less than expected: %d\n", nread);
+                                    stamp();
+                                    fprintf(log_stream, "%s:Chunk bytes read are less than expected. %d read of %d expected \n", timestamp, nread, messageSize);
                                 }
                                 if (nread == -1)
                                 {
-                                    fprintf(log_stream, "Error while reading chunk\n");
+                                    stamp();
+                                    fprintf(log_stream, "%s:Error while reading the next chunk from the file\n", timestamp);
+                                    exiting = 0;
+                                }
+                                if (exiting == 0)
+                                {
+                                    break;
                                 }
                                 long unsigned int bodyLen = firstRN + nread;
                                 long unsigned int totalSize = bodyLen + 2;
@@ -559,17 +590,11 @@ int main(int argc, char **argv, char **envp)
                                 i++;
                                 exiting = sendResponse(nextSocket, message, NO_HEADER, totalSize);
                                 free(message);
-                                if (exiting == 0)
-                                {
-                                    fprintf(log_stream, "Exiting == 0 in chunks\n");
-                                    break;
-                                }
                             }
                             if (exiting == 1)
                             {
                                 long unsigned int lastChunkSize = fsize - (i - 1) * messageSize;
                                 sprintf(hexChunk, "%lx", lastChunkSize);
-                                fprintf(log_stream, "Last chunk size hex: %s", hexChunk);
                                 long unsigned int hexLen = strlen(hexChunk);
                                 long unsigned int firstRN = hexLen + 2;
                                 message = (char *)malloc(firstRN + lastChunkSize + 2);
@@ -578,11 +603,13 @@ int main(int argc, char **argv, char **envp)
                                 nread = fread(message + firstRN, 1, lastChunkSize, f); //the chunk
                                 if (nread < lastChunkSize)
                                 {
-                                    fprintf(log_stream, "Last chunk bytes read are less than expected: %d", nread);
+                                    stamp();
+                                    fprintf(log_stream, "%s:Last chunk bytes read are less than expected: %d\n", timestamp, nread);
                                 }
                                 if (nread == -1)
                                 {
-                                    fprintf(log_stream, "Error while reading chunk\n");
+                                    stamp();
+                                    fprintf(log_stream, "%s:Error while reading chunk\n", timestamp);
                                 }
                                 long unsigned int bodyLen = firstRN + nread;
                                 long unsigned int totalSize = bodyLen + 2;
@@ -591,16 +618,15 @@ int main(int argc, char **argv, char **envp)
                                 free(message);
                                 if (exiting == 1)
                                 {
-                                    write(nextSocket, "0\r\n\r\n", 5);
-                                    
-                                }else{
-                                    fprintf(log_stream, "Exiting == 0 in last chunk\n");
+                                    exiting = sendResponse(nextSocket, "0\r\n\r\n", NO_HEADER, 5);
+                                    if (exiting == 1){
+                                        stamp();
+                                        fprintf(log_stream, "%s:Last chunk sent correctly\n", timestamp);
+                                    }else{
+                                        stamp();
+                                        fprintf(log_stream, "%s:Error while sending last chunk\n", timestamp);
+                                    }
                                 }
-                            }
-                            else
-                            {
-
-                                fprintf(log_stream, "Error in chunk: %d", i);
                             }
                         }
                         fclose(f);
@@ -608,9 +634,10 @@ int main(int argc, char **argv, char **envp)
                     }
                 }
             }
+            stamp();
+            fprintf(log_stream, "%s:Closing the socket\n", timestamp);
             close(nextSocket);
-
-            
+            exiting = 1;
         }
 
         /* Real server should use select() or poll() for waiting at
