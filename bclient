@@ -1,0 +1,66 @@
+#!/bin/bash
+#bclient <machine> <port> <file> <N-threads> <N-cycles>
+
+#Indicates the name or IP address where the server is running
+MACHINE=$1
+
+#The port number of the corresponding server
+PORT=$2
+
+#The path to the file that is going to be transferred 
+#(it could be a text file or an image of any size)
+FILE=$3
+
+#Number of threads that are to be created to send requests to the corresponding server. 
+THREADS=$4
+
+#Number of cycles that each thread is going to repeat the request.
+CYCLES=$5
+
+echo "this is" $MACHINE $PORT $FILE $THREADS $CYCLES
+
+#Example: bclient localhost 8080 /home/ger534/Desktop/photoBin.jpg 5 5 
+
+#Report CSV format that summarize:
+#Test;Requests;Initial request time;Kind of file;Size of file;Response time;Amount of requests;Average response time
+
+#The kind of test that was performed (against which specific web server)
+TEST="TODO: search for the test type in the config file"
+echo "*** test " $TEST "in server " $MACHINE
+
+#Number of requests sent to a web server
+REQUESTS="TODO: Number of requests sent to the web server"
+echo "*** requests " $REQUESTS 
+
+#Initial request time
+INITIAL_REQUESTS_TIME="TODO: Initial request time"
+echo "*** initial request time " $INITIAL_REQUESTS_TIME 
+
+#The kind of file
+FILE_KIND="$(file $FILE)"
+echo "*** file kind " "${FILE_KIND}" 
+
+#The file size
+FILE_SIZE="$(stat --format=%s $FILE)"
+echo "*** file size " "${FILE_SIZE}"
+
+#Response time
+RESPONSE_TIME="TODO: Response time"
+echo "*** response time " $RESPONSE_TIME 
+
+#Amount of requests
+AMOUNT_REQUESTS="TODO: Amount of requests"
+echo "*** amount of requests " $AMOUNT_REQUESTS
+
+#Average response time
+AVERAGE_RESPONSE_TIME="TODO: Average response time"
+echo "*** average response time " $AVERAGE_RESPONSE_TIME
+
+
+
+#It should be simple to identify which web server has the best average response time.
+
+
+
+
+
