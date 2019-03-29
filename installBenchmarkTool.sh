@@ -3,5 +3,5 @@
 
 sudo cp bclient /usr/bin
 
-#make it excecutable: 
+#to make it executable: 
 sudo chmod +x /usr/bin/bclient

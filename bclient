@@ -57,6 +57,12 @@ AVERAGE_RESPONSE_TIME="TODO: Average response time"
 echo "*** average response time " $AVERAGE_RESPONSE_TIME
 
 
+#compiles the c file that is going measure the times
+gcc script.c
+
+#execute the script
+./a.out 5 lena.ppm lena_out.ppm
+
 
 #It should be simple to identify which web server has the best average response time.
 
