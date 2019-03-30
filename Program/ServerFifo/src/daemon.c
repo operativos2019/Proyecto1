@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -62,7 +61,7 @@ struct stat s;
 #define HTTP_INTERNAL "HTTP/1.1 500\r\nINTERNAL SERVER ERROR\r\n\r\n"
 #define NO_HEADER "NO_HEADER\n\n"
 
-#define PATH "home/criss/"
+#define PATH "/home/Server/Files/"
 
 /**
  * \brief This function will daemonize this app
@@ -153,8 +152,7 @@ static void daemonize()
 
 //CONFIG FILE METHODS BEGIN
 /*
- * En caso de que el directorio especificado exista
- * de lo contrario lo crea
+ * Verifies if the config file exists otherwise creates it
  */
 void verifyConfigDir()
 {
@@ -164,7 +162,7 @@ void verifyConfigDir()
     if (-1 == err)
     {
         mkdir(CONFIG_FILE_DIR, 0700);
-        printf("Directorio de configuracion creado.\n");
+        printf("Config directory created.\n");
     }
 }
 
@@ -180,7 +178,7 @@ void createConfigFile()
 
     if (file == NULL)
     {
-        printf("No fue posible crear el archivo de configuración.\n Intente con sudo ./ejecutable\n");
+        printf("Not possible to create the config file.\n Try again with sudo ./executable\n");
         exit(EXIT_FAILURE);
     }
 
@@ -192,7 +190,7 @@ void createConfigFile()
         fclose(file);
     }
 
-    printf("Archivo de configuración creado.\n");
+    printf("Config file created.\n");
 }
 
 /*
@@ -240,8 +238,7 @@ int *getPortFromConfigFile()
 }
 
 /*
- *  Funcion que retorna la ruta al log file del webserver
- *  si no lo encuentra retorna NULL
+ *  Returns the log file route or null
  */
 char *getLogPathFromConfigFile()
 {
@@ -309,7 +306,6 @@ void stamp()
 
 /**
  * Debugin method made to test what the chunk being sent to the server contains
- * 
  * */
 void printError(const char *error, int size)
 {
@@ -368,6 +364,7 @@ int sendResponse(int socket, const char *message, const char *header, int nread)
 /* Main function */
 int main(int argc, char **argv, char **envp)
 {
+    printf("Running server\n");
     char *logFilePath;
 
     logFilePath = NULL;
@@ -396,7 +393,7 @@ int main(int argc, char **argv, char **envp)
     errorNo = (fileDescriptor = socket(AF_INET, SOCK_STREAM, 0)); //Creates the fileDescriptor with an autoselected protocol
     if (errorNo <= -1)
     {
-        perror("Error while creating file descriptor");
+        perror("Error while creating file descriptor\n");
         exiting = 0;
     }
 
@@ -404,7 +401,7 @@ int main(int argc, char **argv, char **envp)
     errorNo = setsockopt(fileDescriptor, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
     if (errorNo == -1)
     {
-        perror("setsockopt failed");
+        perror("setsockopt failed\n");
         exiting = 0;
     }
 

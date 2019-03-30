@@ -1,0 +1,43 @@
+#######################################################################
+1) Instructions to install docker and the server
+2) Instructions to uninstall and reinstall the server on the container
+3) Instructions to run any command within the container
+4) Instructions stop and delete the container
+5) Instructions to uninstall docker from the machine 
+######################################################################
+1)
+The OS version that should be used to test it is Ubuntu 18.04 LTS
+
+First you need to extract the project files and go to the directory where they are located,
+then you can open a terminal inside the directory call "Program". Then run the script using the following command:
+
+	sudo bash Installation.sh
+
+This is will prompt you to accept please type Y and hit enter when asked to.
+This installs the docker, the container and the server within it.
+
+2) 
+In order to uninstall and reinstall the server within the container the following commands are used: 
+
+    sudo docker exec CONTAINER_ID /home/Server/uninstallServer.sh 
+
+    sudo docker exec CONTAINER_ID /home/Server/installServer.sh 
+
+Replacing CONTAINER_ID with the correct ID of the newly created container
+3) 
+In general in order to run any command such as systemtcl status WebServer.service the following structure is used:
+
+    sudo docker exec CONTAINER_ID COMMAND_TO_RUN
+
+Replacing CONTAINER_ID with the correct ID of the newly created container and COMMAND_TO_RUN with the desired command
+    
+The server searches for files on the folder /home/Server/Files/ 
+The configuration file is located on /etc/webserver/config.conf within the container
+
+4) 
+To remove the container use the following command:
+	sudo bash Uninstallation.sh
+
+5)
+In order to uninstall docker from the machine the following command is needed:
+	sudo bash ServerFifo/uninstallDocker.sh
