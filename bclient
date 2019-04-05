@@ -21,11 +21,7 @@ CYCLES=$5
 #Test;Requests;Initial request time;Kind of file;Size of file;Response time;Amount of requests;Average response time
 
 #compiles the c file that is going measure the times
-gcc -pthread benchmark.c
+gcc -pthread bclient.c -o bclient.out
 
 #execute the script
-sudo ./a.out $MACHINE $PORT $FILE $THREADS $CYCLES
-
-
-
-
+sudo ./bclient.out $MACHINE $PORT $FILE $THREADS $CYCLES
