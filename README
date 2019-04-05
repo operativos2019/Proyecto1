@@ -5,4 +5,7 @@ And then you can run the command line with bclient following the next structure:
     bclient <machine> <port> <file> <N-threads> <N-cycles>
 
 
-Example: bclient localhost 8080 /home/ger534/Desktop/photoBin.jpg 5 5 
+Example: bclient localhost 8001 html_basic_document.html 5 5 
+
+for using only the .c: 
+sudo ./a.out localhost 8001 html_basic_document.html 5 5 
