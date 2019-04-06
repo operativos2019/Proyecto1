@@ -115,23 +115,70 @@ int pthread_detach(mypthread_t thread) {
     return 0;
 }
 
-/*
-void* threadFunction( void* argument )
-{
-         printf( "child thread exiting\n" );
-         return 0;
+/**
+ *  Gives up processor
+ */
+int pthread_yield() {
+	sched_yield();
+    return 0;
 }
 
-int main() {
+/**
+ *  Gives up processor
+ */
+void pthread_exit(void* retval) {
+	//kill();
+}
 
-    mypthread_t thread1, thread2;
-    pthread_create(&thread1, NULL, &threadFunction, NULL);
-    pthread_create(&thread2, NULL, &threadFunction, NULL);
-    pthread_detach(thread1);
-    pthread_detach(thread2);
+/**
+ * creates mutex
+ */ 
+int mymutex_init(mymutex_t *mutex) {
+  if (mutex->ready) {
+    return -1;
+  }
 
-    printf("execution ended\n");
+  mutex->ready = 1;
+  mutex->state = FREE;
+  return 0;
+}
 
+/**
+ * locks mutex
+ */
+int mymutex_lock(mymutex_t *mutex) {
+  if (mutex->ready) {
+    while (xchg(&mutex->state, 1) != 0) ;
     return 0;
+  }
+  return -1;
+}
 
-}*/
+/**
+ * try locking mutex
+ */
+int mymutex_trylock(mymutex_t *mutex) {
+  if (mutex->ready)
+    return xchg(&mutex->state, 1);
+  return -1;
+}
+
+/**
+ * unlocks the mutex
+ */
+int mymutex_unlock(mymutex_t *mutex) {
+  if (mutex->ready)
+    return !xchg(&mutex->state, 0);
+  return -1;
+}
+
+/**
+ * destroy the mutex
+ */
+int mymutex_destroy(mymutex_t *mutex) {
+  if (mutex->ready) {
+    mutex->ready = 0;
+    return 0;
+  }
+  return -1;
+}

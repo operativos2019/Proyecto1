@@ -33,5 +33,58 @@ extern int pthread_join(mypthread_t thread, void **retval);
  */
 extern int pthread_detach(mypthread_t thread);
 
+/**
+ *  Gives up processor
+ */
+extern int pthread_yield();
+
+/**
+ *  Ends thread
+ */
+extern void pthread_exit(void* retval);
+
+#define FREE 0
+#define LOCKED 1
+
+typedef unsigned int uint;
+
+typedef struct mymutex {
+  uint state;
+  int ready;
+} mymutex_t;
+
+/**
+ * creates mutex
+ */ 
+extern int mymutex_init(mymutex_t *);
+
+/**
+ * locks mutex
+ */
+extern int mymutex_lock(mymutex_t *);
+
+/**
+ * try locking mutex
+ */
+extern int mymutex_trylock(mymutex_t *);
+
+/**
+ * unlocks the mutex
+ */
+extern int mymutex_unlock(mymutex_t *);
+
+/**
+ * destroy the mutex
+ */
+extern int mymutex_destroy(mymutex_t *);
+
+static inline unsigned int xchg(uint *addr, uint newval) {
+  uint result;
+  asm volatile("lock; xchgl %0, %1" :
+               "+m" (*addr), "=a" (result) :
+               "1" (newval) :
+               "cc");
+  return result;
+}
 
 #endif
