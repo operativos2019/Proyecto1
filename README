@@ -1,11 +1,14 @@
-for the installation of the benchmark tool you just need to run the script like this:
+to run the whole benchmark you can just run the command line:
+    bash ./installBenchmarkTool.sh
+
+*this temporaly will create a csv file for each test inside the benchmark tool
+
+if you only want to install the bclient you just need to run the script like this:
     bash ./installBenchmarkTool.sh
 
 And then you can run the command line with bclient following the next structure:
     bclient <machine> <port> <file> <N-threads> <N-cycles>
 
-
 Example: bclient localhost 8001 html_basic_document.html 5 5 
 
-for using only the .c: 
-sudo ./a.out localhost 8001 html_basic_document.html 5 5 
+

@@ -16,6 +16,7 @@
  */
 struct ThreadArguments {
 	void* (*function)(void*);
+    void*               args;    
 };
 
 /*
@@ -23,12 +24,14 @@ struct ThreadArguments {
  */ 
 static int threadStart( void* arg ) {
 	struct ThreadArguments* arguments = (struct ThreadArguments*) arg;
-	void* (*function)() = arguments->function;
-	free( arguments );
-	arguments = NULL;
+	//void* (*function)() = arguments->function;
+    //void* args = arguments->args;
+	//free( arguments );
+	//arguments = NULL;
+    arguments->function(arguments->args);
 
 	printf( "Child created and calling function = %p\n", arg );
-	function();
+	//function(args);
 	return 0;
 }
 
@@ -36,7 +39,7 @@ static int threadStart( void* arg ) {
  *  Used to create threads 
  *  return 0 if succesful
  */
-int pthread_create(mypthread_t*               thread,
+int pthread_create(mypthread_t*             thread,
                    const pthread_attr_t*      attr,
                    void* (*function)       (void*),
                    void*                       arg) {
@@ -62,14 +65,17 @@ int pthread_create(mypthread_t*               thread,
 	    return -2;
 	}
 
-	arguments->function = function;          
+	arguments->function = function; 
+    arguments->args = arg;         
 
     printf( "Creating child thread\n" );
        
     // Call the clone system call to create the child thread
     thread->pid = clone(&threadStart,
                   (char*) stack + STACK,
-                  SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM,
+                  //SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM,
+                  SIGCHLD | CLONE_VM,
+                  //SIGCHLD|CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND |CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID,
                   arguments );
 
     if ( thread->pid == 0 ) {
@@ -108,24 +114,3 @@ int pthread_detach(mypthread_t thread) {
     kill(thread.pid, SIGCONT);
     return 0;
 }
-
-/*
-void* threadFunction( void* argument )
-{
-         printf( "child thread exiting\n" );
-         return 0;
-}
-
-int main() {
-
-    mypthread_t thread1, thread2;
-    pthread_create(&thread1, NULL, &threadFunction, NULL);
-    pthread_create(&thread2, NULL, &threadFunction, NULL);
-    pthread_detach(thread1);
-    pthread_detach(thread2);
-
-    printf("execution ended\n");
-
-    return 0;
-
-}*/

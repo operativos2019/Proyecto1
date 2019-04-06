@@ -11,14 +11,14 @@
 int main(int argc, char **argv){
 
     //to install the bclient
-    system("bash ./installBenchmarkTool.sh");
+    system("bash ./installBclient.sh");
 
     char FIFO[1035]="bclient localhost 8001 html_basic_document.html 5 5";
     //strcat(command,container);
     //strcat(command," >/dev/null");
     system(FIFO);
     
-    char THREADED[1035]="bclient http://127.0.0.1/ 8001 html_basic_document.html 5 5";
+    char THREADED[1035]="bclient 127.0.0.1 8001 html_basic_document.html 5 5";
     system(THREADED);
     
 }

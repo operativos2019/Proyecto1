@@ -20,8 +20,14 @@ CYCLES=$5
 #Report CSV format that summarize:
 #Test;Requests;Initial request time;Kind of file;Size of file;Response time;Amount of requests;Average response time
 
-#compiles the c file that is going measure the times
-gcc -pthread bclient.c -o bclient.out
+#compiles the library of mypthreads
+gcc -o mypthread.o -c myPthreads/mypthread.c
+
+#compiles the c file that is going measure the times and link the library mypthreads
+gcc bclient.c mypthread.o -o bclient.out
+#gcc bclient.c -pthread -o bclient.out
+
+#TODO: Remember to use the file pthreads if you want to use the other library
 
 #execute the script
 sudo ./bclient.out $MACHINE $PORT $FILE $THREADS $CYCLES

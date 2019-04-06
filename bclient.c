@@ -5,12 +5,16 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <pthread.h>
-//#include "myPthreads/mypthread.h"
+//#include <pthread.h>
+#include "myPthreads/mypthread.h"
 #include <time.h>
 
 //http://www.convertdatatypes.com/Convert-char-Array-to-double-in-CPlusPlus.html
 
+/**
+ * this function is to run a command instruction but it catches the
+ * output of return 
+**/
 char* runCommand(char* command){
     FILE *fp;
     char output[1035];
@@ -32,6 +36,9 @@ char* runCommand(char* command){
    
 }
 
+/**
+ * creates the csv file where the information is going to be written
+**/
 FILE* createCSVFile(char* machine,  char* test){
     
     FILE *fp;
@@ -50,17 +57,16 @@ FILE* createCSVFile(char* machine,  char* test){
 
 }
 
+/**
+ * caculates the amount of requests that are going to be done
+**/
 int amountRequests(int threads, int cycles){
     return threads*cycles;
 }
 
-/* delay in milli seconds */
-void delay(float milli_seconds) {
-    clock_t start_time = clock();
-    while (clock() < start_time + milli_seconds);
-}
-
-//Initial request time
+/**
+ * caculates the initial request time using curl
+**/
 char* initialRequestTime(char * machine, char *port, char *file){
     char request[1035] = "curl -sw \"%{time_connect}\" -o ";
     strcat(request, file);
@@ -75,6 +81,9 @@ char* initialRequestTime(char * machine, char *port, char *file){
     return time_taken;
 }
 
+/**
+ * auxilar function to get the file type without \n characters
+**/
 void copy_string(char d[], char s[]) {
   
   int c = 0;
@@ -92,6 +101,9 @@ void copy_string(char d[], char s[]) {
   d[c] = '\0';
 }
 
+/**
+ * gets the file type thats being just for the test using the "file" command
+**/
 char* fileKind(char *file){
     char command[1035] = "file ";
     strcat(command,file);
@@ -104,6 +116,9 @@ char* fileKind(char *file){
 
 }
 
+/**
+ * gets the file size thats being just for the test using the "stat" command
+**/
 char* fileSize(char *file){
     char command[1035] = "stat --format=%s ";
     strcat(command,file);
@@ -113,9 +128,10 @@ char* fileSize(char *file){
     return fileSize;
 }
 
-
-//Response time
-//https://www.jonefox.com/blog/2011/10/10/find-the-time-to-first-byte-using-curl/
+/**
+ * gets the response time using the curl 
+ * https://www.jonefox.com/blog/2011/10/10/find-the-time-to-first-byte-using-curl/
+**/
 char* responseTime(char * machine, char *port, char *file){
     char request[1035] = "curl -sw \"%{time_starttransfer}\" -o ";
     strcat(request, file);
@@ -130,7 +146,10 @@ char* responseTime(char * machine, char *port, char *file){
     return time_taken;
 }
 
-//Average response time
+/**
+ * calculates the average response time
+ * currently not being use
+**/
 double averageResponseTime(int requests, double* responseTime){
     //TODO: Fix the problem with the zeros in the array
     double sum = 0.00;
@@ -140,7 +159,10 @@ double averageResponseTime(int requests, double* responseTime){
     return sum/requests;
 }
 
-//type of test
+/**
+ * extracts the type of scheduler thats being use by coping the config file from the container
+ * and reading the data
+**/
 char *extractTest(char* container){
 
     //to delete the '\n' char
@@ -174,9 +196,11 @@ char *extractTest(char* container){
     return scheduler;
 }
 
+/**
+ * add a row of info to the csv file
+**/
 FILE* addToCSVFile(FILE* filePointer,  char* test, int requests, char* initial_request_time, char* fileType, char* fileSize, 
                 char* response_time, double average_response_time){
-
     
     fprintf(filePointer, "%s,%d,%s,%s,%s,%s,%f\n", test, requests, initial_request_time, fileType, fileSize, response_time, average_response_time);
 
@@ -184,6 +208,9 @@ FILE* addToCSVFile(FILE* filePointer,  char* test, int requests, char* initial_r
     return filePointer;
 }
 
+/**
+ * of the parameters for the thread to calculates the data
+**/
 struct args {
     int threads;
     int cycles;
@@ -193,7 +220,10 @@ struct args {
     char* port;
     char* file;
 };
-//if we need more that one argument we create a struct and we past a pointer to it
+
+/**
+ * the thread calculates info for all the cycles thats need to be run
+**/
 void *wholeInfo(void *args){
     
     char* machine = ((struct args*)args)->machine;
@@ -219,6 +249,7 @@ void *wholeInfo(void *args){
 int main(int argc, char **argv){
 
     //in case container is not running
+    //TODO: fix this parameter that it's fixed  
     char* container = runCommand("sudo docker ps -a | grep webserverfifo | awk '{print $1}'");
     char command[1035]="sudo docker start ";
     strcat(command,container);
@@ -237,7 +268,8 @@ int main(int argc, char **argv){
     //to make the threads
     for (int i = 0; i < threads; i++){
 
-        pthread_t thread_id;
+        mypthread_t thread_id;
+        //pthread_t thread_id;
         struct args *argsForThread = (struct args *)malloc(sizeof(struct args));
         
         //arguments
@@ -249,7 +281,7 @@ int main(int argc, char **argv){
         argsForThread->port = port;
         argsForThread->file = file;
 
-        pthread_create(&thread_id, NULL, wholeInfo, (void *)argsForThread);
+        pthread_create(&thread_id, NULL, &wholeInfo, (void *)argsForThread);
         pthread_join(thread_id, NULL);
 
     }
