@@ -16,6 +16,7 @@
  */
 struct ThreadArguments {
 	void* (*function)(void*);
+    void*               args;    
 };
 
 /*
@@ -23,12 +24,14 @@ struct ThreadArguments {
  */ 
 static int threadStart( void* arg ) {
 	struct ThreadArguments* arguments = (struct ThreadArguments*) arg;
-	void* (*function)() = arguments->function;
-	free( arguments );
-	arguments = NULL;
+	//void* (*function)() = arguments->function;
+    //void* args = arguments->args;
+	//free( arguments );
+	//arguments = NULL;
+    arguments->function(arguments->args);
 
 	printf( "Child created and calling function = %p\n", arg );
-	function();
+	//function(args);
 	return 0;
 }
 
@@ -36,7 +39,7 @@ static int threadStart( void* arg ) {
  *  Used to create threads 
  *  return 0 if succesful
  */
-int pthread_create(mypthread_t*               thread,
+int pthread_create(mypthread_t*             thread,
                    const pthread_attr_t*      attr,
                    void* (*function)       (void*),
                    void*                       arg) {
@@ -62,7 +65,8 @@ int pthread_create(mypthread_t*               thread,
 	    return -2;
 	}
 
-	arguments->function = function;          
+	arguments->function = function; 
+    arguments->args = arg;         
 
     printf( "Creating child thread\n" );
        
