@@ -73,7 +73,9 @@ int pthread_create(mypthread_t*             thread,
     // Call the clone system call to create the child thread
     thread->pid = clone(&threadStart,
                   (char*) stack + STACK,
-                  SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM,
+                  //SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM,
+                  SIGCHLD | CLONE_VM,
+                  //SIGCHLD|CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND |CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID,
                   arguments );
 
     if ( thread->pid == 0 ) {
