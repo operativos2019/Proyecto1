@@ -48,7 +48,7 @@ static char *timestamp;
 //Config file
 #define CONFIG_FILE_DIR "/etc/webserver"
 #define CONFIG_FILE_PATH "/etc/webserver/config.conf"
-#define CONFIG_FILE_DEFAULT_PORT "PORT=8001"
+#define CONFIG_FILE_DEFAULT_PORT "PORT=8003"
 #define CONFIG_FILE_DEFAULT_LOG_PATH "LOGFILE=/var/log/webserver.log"
 
 struct stat s;
@@ -364,6 +364,7 @@ int sendResponse(int socket, const char *message, const char *header, int nread)
 /* Main function */
 int main(int argc, char **argv, char **envp)
 {
+
     printf("Running server\n");
     char *logFilePath;
 
@@ -450,7 +451,6 @@ int main(int argc, char **argv, char **envp)
     /* Never ending loop of server */
     while (running == 1)
     {
-
         /* Debug print */
         stamp();
         int ret = fprintf(log_stream, "%s:Waiting for next item\n", timestamp);
@@ -467,17 +467,24 @@ int main(int argc, char **argv, char **envp)
                    (log_stream == stdout) ? "stdout" : logFilePath, strerror(errno));
             break;
         }
-        //Accepts the next item in the queue
         errorNo = (nextSocket = accept(fileDescriptor, (struct sockaddr *)&socketAddress, &address_len));
-        if (errorNo == -1)
+        //Accepts the next item in the queue
+        int forked = fork();
+        if (forked != 0)
         {
             stamp();
-            fprintf(log_stream, "%s:Error while accepting next item on the queue\n", timestamp);
-            exiting = 0;
+            fprintf(log_stream, "%s:Closing parent socket\n", timestamp);
+            close(nextSocket);
         }
-
-        else //accepted correctly
+        else
         {
+
+            if (errorNo == -1)
+            {
+                stamp();
+                fprintf(log_stream, "%s:Error while accepting next item on the queue\n", timestamp);
+                exiting = 0;
+            }
 
             sprintf(hexChunk, "%x", messageSize);
             char request[10000] = {0};
@@ -488,6 +495,9 @@ int main(int argc, char **argv, char **envp)
             {
                 httpHeader = HTTP_BAD_REQUEST;
                 sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
+                stamp();
+                fprintf(log_stream, "%s:Exiting child process with error reading request\n", timestamp);
+                exit(0);
             }
             else
             {
@@ -616,10 +626,13 @@ int main(int argc, char **argv, char **envp)
                                 if (exiting == 1)
                                 {
                                     exiting = sendResponse(nextSocket, "0\r\n\r\n", NO_HEADER, 5);
-                                    if (exiting == 1){
+                                    if (exiting == 1)
+                                    {
                                         stamp();
                                         fprintf(log_stream, "%s:Last chunk sent correctly\n", timestamp);
-                                    }else{
+                                    }
+                                    else
+                                    {
                                         stamp();
                                         fprintf(log_stream, "%s:Error while sending last chunk\n", timestamp);
                                     }
@@ -635,12 +648,9 @@ int main(int argc, char **argv, char **envp)
             fprintf(log_stream, "%s:Closing the socket\n", timestamp);
             close(nextSocket);
             exiting = 1;
+            fprintf(log_stream, "%s:Exiting child process\n", timestamp);
+            exit(0);
         }
-
-        /* Real server should use select() or poll() for waiting at
-		 * asynchronous event. Note: sleep() is interrupted, when
-		 * signal is received. */
-        sleep(delay);
     }
 
     return EXIT_SUCCESS;

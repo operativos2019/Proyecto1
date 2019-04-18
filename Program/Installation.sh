@@ -1,2 +1,2 @@
-bash ServerFifo/installDocker.sh
-bash ServerFifo/installContainer.sh
+bash installDocker.sh
+bash installContainer.sh

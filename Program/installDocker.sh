@@ -2,12 +2,12 @@
 #This file is used to install docker on a machine
 ######################################################################
 #Remove old versions of docker 
-apt-get remove docker docker-engine docker.io containerd runc 
+apt-get remove docker docker-engine docker.io containerd runc -y
 
 #Install the dependencies
-apt-get update
+apt-get -y update
 
-apt-get install \
+apt-get -y install \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -24,8 +24,8 @@ add-apt-repository \
    stable"
 
 #Actually install docker
-apt-get update
-apt-get install docker-ce docker-ce-cli containerd.io
+apt-get -y update
+apt-get -y install docker-ce docker-ce-cli containerd.io
 
 #Makes docker run on boot
 systemctl enable docker

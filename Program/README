@@ -4,6 +4,9 @@
 3) Instructions to run any command within the container
 4) Instructions stop and delete the container
 5) Instructions to uninstall docker from the machine 
+6) Install and run benchmarks 
+7) Run the threaded server with Pthreads instead of myPthreads
+8) Server names
 ######################################################################
 1)
 The OS version that should be used to test it is Ubuntu 18.04 LTS
@@ -19,19 +22,19 @@ This installs the docker, the container and the server within it.
 2) 
 In order to uninstall and reinstall the server within the container the following commands are used: 
 
-    sudo docker exec CONTAINER_ID /home/Server/uninstallServer.sh 
+    sudo docker exec CONTAINER_NAME bash /usr/Server/uninstallServer.sh 
 
-    sudo docker exec CONTAINER_ID /home/Server/installServer.sh 
+    sudo docker exec CONTAINER_NAME bash /usr/Server/installServer.sh 
 
-Replacing CONTAINER_ID with the correct ID of the newly created container
+Replacing CONTAINER_NAME with the correct name of the newly created container
 3) 
 In general in order to run any command such as systemtcl status WebServer.service the following structure is used:
 
-    sudo docker exec CONTAINER_ID COMMAND_TO_RUN
+    sudo docker exec CONTAINER_NAME bash COMMAND_TO_RUN
 
-Replacing CONTAINER_ID with the correct ID of the newly created container and COMMAND_TO_RUN with the desired command
+Replacing CONTAINER_NAME with the correct name of the newly created container and COMMAND_TO_RUN with the desired command
     
-The server searches for files on the folder /home/Server/Files/ 
+The server searches for files on the folder /usr/Server/Files/ 
 The configuration file is located on /etc/webserver/config.conf within the container
 
 4) 
@@ -40,4 +43,30 @@ To remove the container use the following command:
 
 5)
 In order to uninstall docker from the machine the following command is needed:
-	sudo bash ServerFifo/uninstallDocker.sh
+	sudo bash uninstallDocker.sh
+
+6) to run the whole benchmark you can just run the command line:
+    bash ./installBenchmarkTool.sh
+
+*this temporaly will create a csv file for each test inside the benchmark tool
+
+if you only want to install the bclient you just need to run the script like this:
+    bash ./installBenchmarkTool.sh
+
+And then you can run the command line with bclient following the next structure:
+    bclient <machine> <port> <file> <N-threads> <N-cycles>
+
+Example: bclient localhost 8001 html_basic_document.html 5 5 
+
+7) 
+
+In order to run successfully the threaded server with Pthreads library the following needs to be done:
+In the source code ServerThread/src/daemon.c the #include needs to be changed to include the pthreads library and the very next line the typedef needs to be changed from mypthread_t to pthreads_t.
+Then instead of installing using Installation.sh, the installation needs to be done using InstallationP.sh this is to ensure the correct flags being set during the compilation.
+
+8)
+FIFO: webserverfifo
+FORK: webserverfork
+THREAD: webserverthread
+PREFORK: webserverprefork
+PRETHREAD: webserverprethread
