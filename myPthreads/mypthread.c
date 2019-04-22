@@ -30,7 +30,6 @@ static int threadStart( void* arg ) {
 	//arguments = NULL;
     arguments->function(arguments->args);
 
-	printf( "Child created and calling function = %p\n", arg );
 	//function(args);
 	return 0;
 }
@@ -49,7 +48,6 @@ int pthread_create(mypthread_t*             thread,
     // Allocate the stack
     stack = malloc( STACK );
     if ( stack == 0 ) {
-        printf( "Unable to alocate thread stack\n" );
         return -1;
     }
 
@@ -61,14 +59,12 @@ int pthread_create(mypthread_t*             thread,
     
 	if ( arguments == 0 ) {
 		free( thread->stack );
-		printf( "Unable to allocate fiber arguments.\n" );
 	    return -2;
 	}
 
 	arguments->function = function; 
     arguments->args = arg;         
 
-    printf( "Creating child thread\n" );
        
     // Call the clone system call to create the child thread
     thread->pid = clone(&threadStart,
@@ -79,7 +75,6 @@ int pthread_create(mypthread_t*             thread,
                   arguments );
 
     if ( thread->pid == 0 ) {
-        printf( "Unable to create thread\n" );
         return 1;
     }            
 
@@ -92,7 +87,6 @@ int pthread_create(mypthread_t*             thread,
  */
 int pthread_join(mypthread_t thread, void **retval) {
 
-    printf("Waiting for proccess to end \n");
 
     pid_t pid = waitpid(thread.pid, 0, 0 );
     if ( pid == -1 ) {

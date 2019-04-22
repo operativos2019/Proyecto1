@@ -39,13 +39,15 @@ char* runCommand(char* command){
 /**
  * creates the csv file where the information is going to be written
 **/
-FILE* createCSVFile(char* machine,  char* test){
+FILE* createCSVFile(char* machine,  char* port, char* test){
     
     FILE *fp;
     int i, count;
     
     char filename[1035] = "Benchmark_Report_";
     strcat(filename, machine);
+    strcat(filename, "_");
+    strcat(filename, port);
     strcat(filename, "_");
     strcat(filename, test);
     strcat(filename, ".csv");
@@ -64,6 +66,27 @@ int amountRequests(int threads, int cycles){
     return threads*cycles;
 }
 
+
+/**
+ * auxilar function to get the time without commas (using "." instead)
+**/
+void comma_to_dot_string(char d[], char s[]) {
+  
+  int c = 0;
+  char *trash = malloc (sizeof (char) * 1035);
+
+  while (s[c] != '\0') {
+
+    if(s[c] == ','){
+        d[c] = '.';
+    }else{
+        d[c] = s[c];
+    }
+    c++;
+  }
+  d[c] = '\0';
+}
+
 /**
  * caculates the initial request time using curl
 **/
@@ -78,7 +101,9 @@ char* initialRequestTime(char * machine, char *port, char *file){
     strcat(request, file);
 
     char * time_taken = runCommand(request);
-    return time_taken;
+    char * time_taken_dot = malloc (sizeof (char) * 1035);
+    comma_to_dot_string(time_taken_dot,time_taken);
+    return time_taken_dot;
 }
 
 /**
@@ -102,7 +127,8 @@ void copy_string(char d[], char s[]) {
 }
 
 /**
- * gets the file type thats being just for the test using the "file" command
+ * gets the file type thats being just for the test using thint main(int argc, char **argv){
+e "file" command
 **/
 char* fileKind(char *file){
     char command[1035] = "file ";
@@ -143,7 +169,10 @@ char* responseTime(char * machine, char *port, char *file){
     strcat(request, file);
 
     char * time_taken = runCommand(request);
-    return time_taken;
+    char * time_taken_dot = malloc (sizeof (char) * 1035);
+    comma_to_dot_string(time_taken_dot,time_taken);
+
+    return time_taken_dot;
 }
 
 /**
@@ -246,24 +275,25 @@ void *wholeInfo(void *args){
     } 
 }
 
-int main(int argc, char **argv){
+char* containerID(){
 
-    //in case container is not running
-    //TODO: fix this parameter that it's fixed  
-    char* container = runCommand("sudo docker ps -a | grep webserverfifo | awk '{print $1}'");
-    char command[1035]="sudo docker start ";
-    strcat(command,container);
-    strcat(command," >/dev/null");
-    system(command);
+}
+
+int main(int argc, char **argv){
 
     char *machine = argv[1];
     char *port = argv[2];
     char *file = argv[3];
     int threads = atoi(argv[4]);
     int cycles = atoi(argv[5]);
-
-    char* test = extractTest(container);
-    FILE* counterInFile = createCSVFile(machine,test);
+    
+    //char* container = runCommand("sudo docker ps -a | grep $PORT | awk '{print $1}'");
+    char container[100] = "sudo docker ps -a | grep ";
+    strcat(container, port);
+    strcat(container, " | awk '{print $1}'");
+    char* containerID = runCommand(container);
+    char* test = extractTest(containerID);
+    FILE* counterInFile = createCSVFile(machine,port,test);
 
     //to make the threads
     for (int i = 0; i < threads; i++){
