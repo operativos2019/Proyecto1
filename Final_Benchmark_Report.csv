@@ -1,0 +1,5 @@
+Test,Requests,Initial request time,Kind of file,Size of file,Average response time
+webserverfifo - Self-fish Round Robin,25,0.004458,html_basic_document.html:,102 bytes,0.985714
+webserverfifo - Self-fish Round Robin,25,0.004324,html_basic_document.html:,102 bytes,1.010067
+webserverfifo - Self-fish Round Robin,25,0.004288,html_basic_document.html:,102 bytes,1.015770
+webserverfifo - Self-fish Round Robin,25,0.004423,html_basic_document.html:,102 bytes,1.019455

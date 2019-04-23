@@ -32,12 +32,13 @@ double averageResponseTime(int threads, int cycles, char* **data){
 /**
  * creates the csv file where the final information is going to be written
 **/
-FILE* createReportFile(){
+FILE* createReportFile(char * name){
     
     FILE *fp;
     int i, count;
     
-    char filename[1035] = "Final_Benchmark_Report.csv";
+    char filename[1035] = "";
+    strcat(filename, name);
     fp = fopen(filename, "w+");
     
     fprintf(fp, "%s,%s,%s,%s,%s,%s\n", "Test","Requests","Initial request time","Kind of file","Size of file","Average response time");
@@ -59,21 +60,18 @@ FILE* addToReport(FILE* filePointer,  char* test, char* requests, char* initial_
 }
 
 
-
 /**
  * reads a csv file
 **/
-char* **readCSV(int threads, int cycles, char *filename){
+char* **readCSV(int threads, int cycles, int cols, char *filename){
 
-
-    int row = (threads*cycles) + 1;
-    //QUEMADO!???
-	int col = 7;
-
+    double* averageResponseTime;
+    int rows = (threads*cycles) + 1;
 	char* **data;
-	data = (char* **)malloc(row * sizeof(char* *));
-	for (int i = 0; i < row; ++i){
-		data[i] = (char* *)malloc(col * sizeof(char*));
+
+	data = (char* **)malloc(rows * sizeof(char* *));
+	for (int i = 0; i < rows; ++i){
+		data[i] = (char* *)malloc(cols * sizeof(char*));
 	}
 
 	FILE *file;
@@ -81,7 +79,7 @@ char* **readCSV(int threads, int cycles, char *filename){
 
 	int i = 0;
     char line[4098];
-	while (fgets(line, 4098, file) && (i < row)){
+	while (fgets(line, 4098, file) && (i < rows)){
 
         char* tmp = strdup(line);
 
@@ -90,14 +88,98 @@ char* **readCSV(int threads, int cycles, char *filename){
 	    for (tok = strtok(line, ","); tok && *tok; j++, tok = strtok(NULL, ",\n"))
 	    {
             data[i][j] = tok;
+            printf("%s\t", data[i][j]);
+            if(cols == 6 && j == 5){
+                printf("dato de average %f\t", strtod(tok,NULL));
+                averageResponseTime[i] = strtod(tok,NULL);
+                
+            }
 	    }
+        printf("\n");
 
         free(tmp);
         i++;
     }
-
+    printf("ESTE: %s\n", data[0][0]);
+    int averageResponseTimeCol = 5;
+    printf("lol data: %s\n", data[1][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[2][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[3][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[4][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[5][averageResponseTimeCol]);
     return data;
 }
+
+
+/**
+ * reorders the report
+**/
+void reorderReport(int threads, int cycles, int serverNumber){
+    
+    int rows = threads * cycles;
+    int cols = 6;
+    char* **data = (char* **)malloc(rows * sizeof(char* *));
+	for (int i = 0; i < rows; ++i){
+		data[i] = (char* *)malloc(cols * sizeof(char*));
+	}
+
+    data = readCSV(threads, cycles, cols, "Final_Benchmark_Report_TMP.csv");
+   
+    int averageResponseTimeCol = 5;
+    int *realOrder = malloc(serverNumber * sizeof(int));
+    int *averageRT = malloc(serverNumber * sizeof(int));
+
+    printf("wtf: %s\n", data[0][0]);
+    printf("wtf: %s\n", data[0][1]);
+    printf("wtf: %s\n", data[0][2]);
+    printf("wtf: %s\n", data[0][3]);
+    printf("wtf: %s\n", data[0][4]);
+    printf("wtf1 data: %s\n", data[0][5]);
+    printf("wtf data: %s\n", data[1][5]);
+    printf("lol data: %s\n", data[1][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[2][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[3][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[4][averageResponseTimeCol]);
+    printf("lol data: %s\n", data[5][averageResponseTimeCol]);
+
+
+    for (int i = 1; i < serverNumber; i++){
+		realOrder[i] = i;
+        //ESTO VA A ESTAR FEO
+        printf("real data: %s\n", data[i][averageResponseTimeCol]);
+        printf("real data: %s\n", data[i][averageResponseTimeCol]);
+        averageRT[i] = strtod(data[i][averageResponseTimeCol],NULL) * 10000.0;
+        printf("index created: %d averageRT created: %d real data: %s\n", realOrder[i],averageRT[i],data[i][averageResponseTimeCol]);
+    }
+
+    for (int i = 0; i < (serverNumber-1); i++){
+		for (int j = i + 1; j < (serverNumber-1); j++){
+            
+            printf("index created: %d\n", realOrder[i]);
+
+			if(averageRT[i]> averageRT[j]){
+				int tempRO = realOrder[i];
+				realOrder[i] = realOrder[j];
+				realOrder[j] = tempRO;
+
+                int tempRT = averageRT[i];
+				averageRT[i] = averageRT[j];
+				averageRT[j] = tempRT;
+			}
+		}
+	}
+
+    FILE* filePointer = createReportFile("Final_Benchmark_Report.csv");
+
+    for (int i = 0; i < serverNumber; i++){
+		int index = realOrder[i];
+        addToReport(filePointer, data[index][test], data[index][requests],data[index][initial_request_time], data[index][fileType],data[index][fileSize], strtod(data[index][averageResponseTimeCol],NULL));
+
+    }
+
+    fclose(filePointer);
+
+}  
 
 /**
  * this function is to run a command instruction but it catches the
@@ -222,17 +304,16 @@ int main(int argc, char **argv){
     system(command);
 
 
-    int serverNumber = 5;
-    //char* servers[] = {"webserverfifo","webserverfork","webserverthread","webserverprefork","webserverprethread"};
-    char* servers[] = {"webserverfifo"};
-    serverNumber = 1;
+    int serverNumber = 4;
+    char* servers[] = {"webserverfifo","webserverfork","webserverthread","webserverprefork"};
+    //char* servers[] = {"webserverfifo","webserverfifo","webserverfifo","webserverfifo"};
 
-    char* fileForTest = "html_basic_document.html";
-    //char* fileForTest = "lol.txt";
+    char* fileForTest = "video.ogv";
     int threads = 5;
     int cycles = 5;
     
-    FILE* report = createReportFile();
+    //FILE* report = createReportFile("Final_Benchmark_Report_TMP.csv");
+    FILE* report = createReportFile("Final_Benchmark_Report.csv");
     for(int i = 0; i < serverNumber; i++){
         
         char portChar[256];
@@ -267,7 +348,7 @@ int main(int argc, char **argv){
         printf("comando a correr: %s\n",command);
         system(command);
 
-        char* **dataFromFile = readCSV(threads,cycles,filename);
+        char* **dataFromFile = readCSV(threads,cycles,7,filename);
 
         char testName[1024] = "";
         
@@ -275,11 +356,19 @@ int main(int argc, char **argv){
         strcat(testName, " - ");
         strcat(testName, dataFromFile[1][test]);
 
+
         addToReport(report, testName, dataFromFile[1][requests],dataFromFile[1][initial_request_time], dataFromFile[1][fileType],dataFromFile[1][fileSize], averageResponseTime(threads,cycles,dataFromFile));
     
 
     }
 
     fclose(report);
+
+    char command_rm_config[1035]="sudo rm benchmark.out";
+    system(command_rm_config);
+    char command_rm_config[1035]="sudo rm bclient.out";
+    system(command_rm_config);
+
+    //reorderReport(threads, cycles, serverNumber);
 
 }
