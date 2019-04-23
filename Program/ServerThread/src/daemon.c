@@ -79,8 +79,7 @@ struct stat s;
 #define HTTP_INTERNAL "HTTP/1.1 500\r\nINTERNAL SERVER ERROR\r\n\r\n"
 #define NO_HEADER "NO_HEADER\n\n"
 
-#define PATH "/home/criss/"
-//#define PATH "/var/www/Files/"
+#define PATH "/var/www/Files/"
 
 /**
  * \brief This function will daemonize this app
