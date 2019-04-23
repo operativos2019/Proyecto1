@@ -28,7 +28,11 @@ void* scheduler( void* argument ) {
         queuePointer = 1;
       }
 
-      if(schedType == 2) {
+      else if(schedType == 1) {
+
+      }
+
+      else if(schedType == 2) {
         
         //count tickets
         ticketsCount = 0;
@@ -77,6 +81,13 @@ struct ThreadArguments {
 	void* (*function)(void*);
   void*               args;    
 };
+
+/**
+ *  Pthreads tickets
+ */
+void pthread_ticket(mypthread_t* thread, int tickets){
+  thread->tickets = tickets;
+}
 
 /*
  * Exists to give the proper function type to clone.

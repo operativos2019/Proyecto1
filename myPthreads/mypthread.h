@@ -15,9 +15,9 @@ typedef struct {
     void* stack;
     pid_t pid;
     int tickets;
+    int srrValue;
 
     int priority;
-    int srrValue;
 } mypthread_t;
 
 int schedUp;
@@ -28,6 +28,12 @@ mypthread_t schedThread;
 mypthread_t* queue[MAX_THREADS];
 int queuePointer;
 int queueSize;
+
+/*
+mypthread_t* aQueue[MAX_THREADS];
+mypthread_t* bQueue[MAX_THREADS];
+int a;
+int b;*/
 
 /*
  *  Used to create threads 
@@ -47,6 +53,11 @@ extern int pthread_join(mypthread_t thread, void **retval);
  *  Detaches thread execution
  */
 extern int pthread_detach(mypthread_t thread);
+
+/**
+ *  Pthreads tickets
+ */
+extern void pthread_ticket(mypthread_t* thread, int tickets);
 
 /**
  *  Gives up processor
