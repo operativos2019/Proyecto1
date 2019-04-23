@@ -7,16 +7,75 @@
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "mypthread.h"
 
+/**
+ *  Scheduler
+ */
+void* scheduler( void* argument ) {
+
+  queuePointer = 1;
+
+  int ticketsCount;
+  int ticketWinner;
+  mypthread_t* winnerThread;
+
+  while(1) {
+    if (queueSize > 1) {
+      if( queuePointer >= queueSize ) {
+        queuePointer = 1;
+      }
+
+      if(schedType == 2) {
+        
+        //count tickets
+        ticketsCount = 0;
+
+        for(int i = 1; i < queueSize; i++) {
+          ticketsCount += queue[i]->tickets;
+        }
+
+        ticketWinner = ticketsCount * (double)rand() / (double)RAND_MAX;
+
+        printf("%d\n", ticketWinner);
+
+        ticketsCount = 0;
+
+        for(int i = 1; i < queueSize; i++) {
+          if(ticketsCount >= ticketWinner){
+            winnerThread = queue[i];
+            break;
+          }
+          ticketsCount += queue[i]->tickets;
+        }
+
+        kill(winnerThread->pid, SIGCONT);
+        usleep(100);
+        kill(winnerThread->pid, SIGSTOP);
+            
+      }
+      else {
+
+      kill(queue[queuePointer]->pid, SIGCONT);
+      usleep(100);
+      kill(queue[queuePointer]->pid, SIGSTOP);
+      queuePointer++;
+      }
+
+    }  
+  }
+
+  return 0;
+}
 
 /*
  * Used to pass arguments to clone to comply with its signature   
  */
 struct ThreadArguments {
 	void* (*function)(void*);
-    void*               args;    
+  void*               args;    
 };
 
 /*
@@ -24,14 +83,9 @@ struct ThreadArguments {
  */ 
 static int threadStart( void* arg ) {
 	struct ThreadArguments* arguments = (struct ThreadArguments*) arg;
-	//void* (*function)() = arguments->function;
-    //void* args = arguments->args;
-	//free( arguments );
-	//arguments = NULL;
-    arguments->function(arguments->args);
-
-	printf( "Child created and calling function = %p\n", arg );
-	//function(args);
+  arguments->function(arguments->args);
+  free( arg );
+  free(arguments);
 	return 0;
 }
 
@@ -43,67 +97,87 @@ int pthread_create(mypthread_t*             thread,
                    const pthread_attr_t*      attr,
                    void* (*function)       (void*),
                    void*                       arg) {
-    
-    void* stack;
+
+  schedType = 2; //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+  if( !schedUp ) {
+    printf("sched created\n");
+    schedUp  = 1;
+
+    //init queues
+    queueSize = 0;
+
+    pthread_create(&schedThread, NULL, scheduler, NULL); 
+    kill(schedThread.pid, SIGCONT);
+  }
+
+  void* stack;
         
-    // Allocate the stack
-    stack = malloc( STACK );
-    if ( stack == 0 ) {
-        printf( "Unable to alocate thread stack\n" );
-        return -1;
-    }
+  // Allocate the stack
+  stack = malloc( STACK );
+  if ( stack == 0 ) {
+    printf( "mypthread error: Unable to alocate thread stack\n" );
+    return -1;
+  }
 
-    thread->stack = stack;
-
-    struct ThreadArguments* arguments = NULL;     
-    /* Create the arguments structure. */
+  thread->stack = stack;
+  
+  /* Create the arguments structure. */
+  struct ThreadArguments* arguments = NULL;     
 	arguments = (struct ThreadArguments*) malloc( sizeof(*arguments) );
     
 	if ( arguments == 0 ) {
 		free( thread->stack );
-		printf( "Unable to allocate fiber arguments.\n" );
+		printf( "mypthread error: Unable to allocate thread arguments.\n" );
 	    return -2;
 	}
 
 	arguments->function = function; 
-    arguments->args = arg;         
+  arguments->args = arg;         
 
-    printf( "Creating child thread\n" );
+  //defining thread scheduling params
+  thread->tickets = 1;
        
-    // Call the clone system call to create the child thread
-    thread->pid = clone(&threadStart,
-                  (char*) stack + STACK,
-                  //SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM,
-                  SIGCHLD | CLONE_VM,
-                  //SIGCHLD|CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND |CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID,
-                  arguments );
+  // Call the clone system call to create the child thread
+  thread->pid = clone(&threadStart,
+                      (char*) stack + STACK,
+                      //SIGCHLD | CLONE_VM,
+                      SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_VM , 
+                      arguments );
 
-    if ( thread->pid == 0 ) {
-        printf( "Unable to create thread\n" );
-        return 1;
-    }            
+  if ( thread->pid == 0 ) {
+    printf( "mypthread error: Unable to create thread\n" );
+    return 1;
+  }
 
-    return 0;            
+  kill(thread->pid, SIGSTOP); 
+
+  //insert thread in queue
+  queue[queueSize] = thread;
+  queueSize++;
+
+  return 0;            
 
 }
+
 
 /**
  *  Waits for the especified thread to end
  */
 int pthread_join(mypthread_t thread, void **retval) {
 
-    printf("Waiting for proccess to end \n");
+  printf("Waiting for proccess to end \n");
 
-    pid_t pid = waitpid(thread.pid, 0, 0 );
-    if ( pid == -1 ) {
-        perror( "waitpid\n" );
-        exit( 3 );
-    }
+  pid_t pid = waitpid( thread.pid, 0, 0 );
+  if ( pid == -1 ) {
+    perror( "waitpid\n" );
+    exit( 3 );
+  }
         
-    // Free the stack
-    free( thread.stack );
+  // Free the stack
+  free( thread.stack );
 
-    return pid;
+  return pid;
 
 }
 
@@ -127,7 +201,7 @@ int pthread_yield() {
  *  Gives up processor
  */
 void pthread_exit(void* retval) {
-	//kill();
+  exit(retval);
 }
 
 /**

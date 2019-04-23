@@ -6,13 +6,28 @@
 // 64kB stack
 #define STACK 1024*64
 
+#define MAX_THREADS 1024
+
 /*
  * mypthread struct used to track id and stack 
  */
 typedef struct {
     void* stack;
     pid_t pid;
+    int tickets;
+
+    int priority;
+    int srrValue;
 } mypthread_t;
+
+int schedUp;
+int schedType;
+mypthread_t schedThread;
+
+
+mypthread_t* queue[MAX_THREADS];
+int queuePointer;
+int queueSize;
 
 /*
  *  Used to create threads 
