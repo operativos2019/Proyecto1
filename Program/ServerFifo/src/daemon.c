@@ -49,6 +49,8 @@ static char *timestamp;
 #define CONFIG_FILE_DIR "/etc/webserver"
 #define CONFIG_FILE_PATH "/etc/webserver/config.conf"
 #define CONFIG_FILE_DEFAULT_PORT "PORT=8001"
+#define CONFIG_FILE_DEFAULT_SCHEDULER "SCHEDULER=Selffish Round Robin"
+#define CONFIG_FILE_DEFAULT_SERVER "MACHINE=webserverfifo"
 #define CONFIG_FILE_DEFAULT_LOG_PATH "LOGFILE=/var/log/webserver.log"
 
 struct stat s;
@@ -187,6 +189,10 @@ void createConfigFile()
         fputs(CONFIG_FILE_DEFAULT_PORT, file);
         fputs("\n\n", file);
         fputs(CONFIG_FILE_DEFAULT_LOG_PATH, file);
+        fputs("\n\n", file);
+        fputs(CONFIG_FILE_DEFAULT_SCHEDULER, file);
+        fputs("\n\n", file);
+        fputs(CONFIG_FILE_DEFAULT_SERVER, file);
         fclose(file);
     }
 

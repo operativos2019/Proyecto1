@@ -120,23 +120,23 @@ cd ../
 # docker exec $PRETHREADSERVER systemctl status WebServer.service
 # cd ../
 
-# ######INSTALLING PREFORK SERVER#######################################
-# #Change to the executables folder
-# cd ServerPreFork/
+######INSTALLING PREFORK SERVER#######################################
+#Change to the executables folder
+cd ServerPreFork/
 
-# #Compiles daemon on host gcc environment
-# gcc src/daemon.c -o src/daemon
+#Compiles daemon on host gcc environment
+gcc src/daemon.c -o src/daemon
 
-# #Create the image
-# docker build -t=$PREFORKSERVER .
+#Create the image
+docker build -t=$PREFORKSERVER .
 
-# #Creates the running container
-# docker run --name $PREFORKSERVER -t -d -p 8003:8003 --privileged --security-opt seccomp:unconfined --cap-add=SYS_ADMIN -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /tmp/$(mktemp -d):/run $PREFORKSERVER
+#Creates the running container
+docker run --name $PREFORKSERVER -t -d -p 8003:8003 --privileged --security-opt seccomp:unconfined --cap-add=SYS_ADMIN -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /tmp/$(mktemp -d):/run $PREFORKSERVER
 
-# #executes the server 
-# docker exec $PREFORKSERVER systemctl enable WebServer.service
-# docker exec $PREFORKSERVER systemctl start WebServer.service
-# docker exec $PREFORKSERVER systemctl status WebServer.service
-# cd ../
+#executes the server 
+docker exec $PREFORKSERVER systemctl enable WebServer.service
+docker exec $PREFORKSERVER systemctl start WebServer.service
+docker exec $PREFORKSERVER systemctl status WebServer.service
+cd ../
 
 

@@ -31,14 +31,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <time.h>
-//#include <pthread.h>
-#include "../../myPthreads/mypthread.h"
+#include <pthread.h>
+//#include "../../myPthreads/mypthread.h"
 
-typedef mypthread_t PTHREAD;
+typedef pthread_t PTHREAD;
 static int running = 0;
 static int delay = 1;
 static char *conf_file_name = NULL;
@@ -55,12 +56,17 @@ struct responseArgs
     char *hexChunk;
     int messageSize;
     char *httpHeader;
+    int fileDescriptor;
+    struct sockaddr_in socketAddress;
+    socklen_t addressLen;
 };
 
 //Config file
 #define CONFIG_FILE_DIR "/etc/webserver"
 #define CONFIG_FILE_PATH "/etc/webserver/config.conf"
 #define CONFIG_FILE_DEFAULT_PORT "PORT=8005"
+#define CONFIG_FILE_DEFAULT_SCHEDULER "SCHEDULER=Selffish Round Robin"
+#define CONFIG_FILE_DEFAULT_SERVER "MACHINE=webserverfifo"
 #define CONFIG_FILE_DEFAULT_LOG_PATH "LOGFILE=/var/log/webserver.log"
 
 struct stat s;
@@ -73,7 +79,8 @@ struct stat s;
 #define HTTP_INTERNAL "HTTP/1.1 500\r\nINTERNAL SERVER ERROR\r\n\r\n"
 #define NO_HEADER "NO_HEADER\n\n"
 
-#define PATH "/var/www/Files/"
+#define PATH "/home/criss/"
+//#define PATH "/var/www/Files/"
 
 /**
  * \brief This function will daemonize this app
@@ -199,6 +206,10 @@ void createConfigFile()
         fputs(CONFIG_FILE_DEFAULT_PORT, file);
         fputs("\n\n", file);
         fputs(CONFIG_FILE_DEFAULT_LOG_PATH, file);
+        fputs("\n\n", file);
+        fputs(CONFIG_FILE_DEFAULT_SCHEDULER, file);
+        fputs("\n\n", file);
+        fputs(CONFIG_FILE_DEFAULT_SERVER, file);
         fclose(file);
     }
 
@@ -357,174 +368,184 @@ int sendResponse(int socket, const char *message, const char *header, int nread)
 /**Server logic to generate the response
  * 
  * */
-int generateResponse(int nextSocket, char *hexChunk, int messageSize, char *httpHeader)
+int generateResponse(int fileDescriptor, char *hexChunk, int messageSize, char *httpHeader, struct sockaddr_in socketAddress, socklen_t address_len)
 {
-    int i;
-    int nread;
-    char *message;
+    int errorNo;
+    int nextSocket;
     int exiting = 1;
-    sprintf(hexChunk, "%x", messageSize);
-    char request[10000] = {0};
-
-    int b = read(nextSocket, request, 10000); //reads the file
-
-    //No request sent
-    if (request == "\0" || request == NULL)
+    errorNo = (nextSocket = accept(fileDescriptor, (struct sockaddr *)&socketAddress, &address_len));
+    if (errorNo == -1)
     {
-        httpHeader = HTTP_BAD_REQUEST;
-        sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
         stamp();
-        fprintf(log_stream, "%s:Exiting child process with error reading request\n", timestamp);
+        fprintf(log_stream, "%s:Error while accepting next item on the queue\n", timestamp);
+        exiting = 0;
     }
     else
     {
-        /*********************  Getting the request ****************/
-        stamp();
-        fprintf(log_stream, "%s:Reading the request from the client\n", timestamp);
+        int i;
+        int nread;
+        char *message;
+        int exiting = 1;
+        sprintf(hexChunk, "%x", messageSize);
+        char request[10000] = {0};
 
-        const char *begin = "GET /";
-        const char *end = " HTTP";
-        char *requestString = NULL;
-        char *start, *finish;
-        char *requestBody = NULL;
+        int b = read(nextSocket, request, 10000); //reads the file
 
-        //generates the Get request string
-        if (start = strstr(request, begin))
+        //No request sent
+        if (request == "\0" || request == NULL)
         {
-            start += strlen(begin);
-            if (finish = strstr(start, end))
-            {
-                requestString = (char *)malloc(finish - start + 1);
-                memcpy(requestString, start, finish - start);
-                requestString[finish - start] = '\0';
-            }
-        }
-        if (requestString == NULL || requestString == "\0")
-        {
-            stamp();
-            fprintf(log_stream, "%s:Error while reading the request\n", timestamp);
             httpHeader = HTTP_BAD_REQUEST;
             sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
+            stamp();
+            fprintf(log_stream, "%s:Exiting child process with error reading request\n", timestamp);
         }
         else
         {
-            requestBody = (char *)malloc(sizeof(requestString) * strlen(requestString) + strlen(PATH) * sizeof(PATH));
-            sprintf(requestBody, "%s%s", PATH, requestString);
-            //***check if file can be found****//
-            if (access(requestBody, R_OK) == -1)
+            /*********************  Getting the request ****************/
+            stamp();
+            fprintf(log_stream, "%s:Reading the request from the client\n", timestamp);
+
+            const char *begin = "GET /";
+            const char *end = " HTTP";
+            char *requestString = NULL;
+            char *start, *finish;
+            char *requestBody = NULL;
+
+            //generates the Get request string
+            if (start = strstr(request, begin))
+            {
+                start += strlen(begin);
+                if (finish = strstr(start, end))
+                {
+                    requestString = (char *)malloc(finish - start + 1);
+                    memcpy(requestString, start, finish - start);
+                    requestString[finish - start] = '\0';
+                }
+            }
+            if (requestString == NULL || requestString == "\0")
             {
                 stamp();
-                fprintf(log_stream, "%s:File does not exists or permissions are not granted\n", timestamp);
-                httpHeader = HTTP_NOT_FOUND;
+                fprintf(log_stream, "%s:Error while reading the request\n", timestamp);
+                httpHeader = HTTP_BAD_REQUEST;
                 sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
             }
-            else //file is good
+            else
             {
-                FILE *f = fopen(requestBody, "rb"); //open the file in binary mode
-                fseek(f, 0, SEEK_END);
-                int fsize = ftell(f); //binary file size
-
-                fseek(f, 0, 0);
-                /* The content can be sent in 1 piece*/
-                if (messageSize >= fsize)
+                requestBody = (char *)malloc(sizeof(requestString) * strlen(requestString) + strlen(PATH) * sizeof(PATH));
+                sprintf(requestBody, "%s%s", PATH, requestString);
+                //***check if file can be found****//
+                if (access(requestBody, R_OK) == -1)
                 {
-                    message = (char *)malloc(fsize);
-                    nread = fread(message, 1, sizeof(message) * fsize, f);
-                    /*Sets up the header*/
-                    httpHeader = HTTP_OK;
-                    exiting = sendResponse(nextSocket, message, httpHeader, nread);
-                    free(message);
+                    stamp();
+                    fprintf(log_stream, "%s:File does not exists or permissions are not granted\n", timestamp);
+                    httpHeader = HTTP_NOT_FOUND;
+                    sendResponse(nextSocket, httpHeader, NO_HEADER, strlen(httpHeader));
                 }
-                else
+                else //file is good
                 {
-                    /**Chunked content */
-                    i = 1;
-                    httpHeader = HTTP_CHUNK;
-                    write(nextSocket, httpHeader, strlen(httpHeader));
-                    httpHeader = NO_HEADER;
-                    while (i * messageSize < fsize)
-                    {
-                        //each rn sizes 3
-                        long unsigned int hexLen = strlen(hexChunk);
-                        long unsigned int firstRN = hexLen + 2;
-                        message = (char *)malloc(firstRN + messageSize + 2);
-                        memcpy(message, hexChunk, hexLen);
-                        memcpy(message + hexLen, "\r\n", 2);
-                        nread = fread(message + firstRN, 1, messageSize, f);
-                        if (nread < messageSize)
-                        {
-                            stamp();
-                            fprintf(log_stream, "%s:Chunk bytes read are less than expected. %d read of %d expected \n", timestamp, nread, messageSize);
-                        }
-                        if (nread == -1)
-                        {
-                            stamp();
-                            fprintf(log_stream, "%s:Error while reading the next chunk from the file\n", timestamp);
-                            exiting = 0;
-                            return exiting;
-                        }
-                        if (exiting == 0)
-                        {
-                            return exiting;
-                        }
-                        long unsigned int bodyLen = firstRN + nread;
-                        long unsigned int totalSize = bodyLen + 2;
-                        memcpy(message + bodyLen, "\r\n", 2);
-                        i++;
-                        exiting = sendResponse(nextSocket, message, NO_HEADER, totalSize);
-                        free(message);
+                    FILE *f = fopen(requestBody, "rb"); //open the file in binary mode
+                    fseek(f, 0, SEEK_END);
+                    int fsize = ftell(f); //binary file size
 
-                    }
-                    if (exiting == 1)
+                    fseek(f, 0, 0);
+                    /* The content can be sent in 1 piece*/
+                    if (messageSize >= fsize)
                     {
-                        long unsigned int lastChunkSize = fsize - (i - 1) * messageSize;
-                        sprintf(hexChunk, "%lx", lastChunkSize);
-                        long unsigned int hexLen = strlen(hexChunk);
-                        long unsigned int firstRN = hexLen + 2;
-                        message = (char *)malloc(firstRN + lastChunkSize + 2);
-                        memcpy(message, hexChunk, hexLen); //the hex
-                        memcpy(message + hexLen, "\r\n", 2);
-                        nread = fread(message + firstRN, 1, lastChunkSize, f); //the chunk
-                        if (nread < lastChunkSize)
-                        {
-                            stamp();
-                            fprintf(log_stream, "%s:Last chunk bytes read are less than expected: %d\n", timestamp, nread);
-                        }
-                        if (nread == -1)
-                        {
-                            stamp();
-                            fprintf(log_stream, "%s:Error while reading chunk\n", timestamp);
-                        }
-                        long unsigned int bodyLen = firstRN + nread;
-                        long unsigned int totalSize = bodyLen + 2;
-                        memcpy(message + bodyLen, "\r\n", 2);
-                        exiting = sendResponse(nextSocket, message, NO_HEADER, totalSize);
+                        message = (char *)malloc(fsize);
+                        nread = fread(message, 1, sizeof(message) * fsize, f);
+                        /*Sets up the header*/
+                        httpHeader = HTTP_OK;
+                        exiting = sendResponse(nextSocket, message, httpHeader, nread);
                         free(message);
+                    }
+                    else
+                    {
+                        /**Chunked content */
+                        i = 1;
+                        httpHeader = HTTP_CHUNK;
+                        write(nextSocket, httpHeader, strlen(httpHeader));
+                        httpHeader = NO_HEADER;
+                        while (i * messageSize < fsize)
+                        {
+                            //each rn sizes 3
+                            long unsigned int hexLen = strlen(hexChunk);
+                            long unsigned int firstRN = hexLen + 2;
+                            message = (char *)malloc(firstRN + messageSize + 2);
+                            memcpy(message, hexChunk, hexLen);
+                            memcpy(message + hexLen, "\r\n", 2);
+                            nread = fread(message + firstRN, 1, messageSize, f);
+                            if (nread < messageSize)
+                            {
+                                stamp();
+                                fprintf(log_stream, "%s:Chunk bytes read are less than expected. %d read of %d expected \n", timestamp, nread, messageSize);
+                            }
+                            if (nread == -1)
+                            {
+                                stamp();
+                                fprintf(log_stream, "%s:Error while reading the next chunk from the file\n", timestamp);
+                                exiting = 0;
+                                return exiting;
+                            }
+                            if (exiting == 0)
+                            {
+                                return exiting;
+                            }
+                            long unsigned int bodyLen = firstRN + nread;
+                            long unsigned int totalSize = bodyLen + 2;
+                            memcpy(message + bodyLen, "\r\n", 2);
+                            i++;
+                            exiting = sendResponse(nextSocket, message, NO_HEADER, totalSize);
+                            free(message);
+                        }
                         if (exiting == 1)
                         {
-                            exiting = sendResponse(nextSocket, "0\r\n\r\n", NO_HEADER, 5);
+                            long unsigned int lastChunkSize = fsize - (i - 1) * messageSize;
+                            sprintf(hexChunk, "%lx", lastChunkSize);
+                            long unsigned int hexLen = strlen(hexChunk);
+                            long unsigned int firstRN = hexLen + 2;
+                            message = (char *)malloc(firstRN + lastChunkSize + 2);
+                            memcpy(message, hexChunk, hexLen); //the hex
+                            memcpy(message + hexLen, "\r\n", 2);
+                            nread = fread(message + firstRN, 1, lastChunkSize, f); //the chunk
+                            if (nread < lastChunkSize)
+                            {
+                                stamp();
+                                fprintf(log_stream, "%s:Last chunk bytes read are less than expected: %d\n", timestamp, nread);
+                            }
+                            if (nread == -1)
+                            {
+                                stamp();
+                                fprintf(log_stream, "%s:Error while reading chunk\n", timestamp);
+                            }
+                            long unsigned int bodyLen = firstRN + nread;
+                            long unsigned int totalSize = bodyLen + 2;
+                            memcpy(message + bodyLen, "\r\n", 2);
+                            exiting = sendResponse(nextSocket, message, NO_HEADER, totalSize);
+                            free(message);
                             if (exiting == 1)
                             {
-                                stamp();
-                                fprintf(log_stream, "%s:Last chunk sent correctly\n", timestamp);
-                            }
-                            else
-                            {
-                                stamp();
-                                fprintf(log_stream, "%s:Error while sending last chunk\n", timestamp);
+                                exiting = sendResponse(nextSocket, "0\r\n\r\n", NO_HEADER, 5);
+                                if (exiting == 1)
+                                {
+                                    stamp();
+                                    fprintf(log_stream, "%s:Last chunk sent correctly\n", timestamp);
+                                }
+                                else
+                                {
+                                    stamp();
+                                    fprintf(log_stream, "%s:Error while sending last chunk\n", timestamp);
+                                }
                             }
                         }
                     }
+                    fclose(f);
                 }
-                fclose(f);
             }
         }
+        stamp();
+        fprintf(log_stream, "%s:Closing the socket\n", timestamp);
     }
-    stamp();
-    fprintf(log_stream, "%s:Closing the socket\n", timestamp);
     close(nextSocket);
-    exit(0);
-    return exiting;
 }
 
 /**
@@ -545,7 +566,6 @@ void printError(const char *error, int size)
     fprintf(log_stream, "\n%s:End of message", timestamp);
 }
 
-
 /**Function that servers as threads entry point
  * 
  * */
@@ -553,7 +573,9 @@ void printError(const char *error, int size)
 void *threadedResponse(void *args)
 {
     struct responseArgs *threadedArgs = (struct responseArgs *)args;
-    int response = generateResponse(threadedArgs->nextSocket, threadedArgs->hexChunk, threadedArgs->messageSize, threadedArgs->httpHeader);
+
+    int response = generateResponse(threadedArgs->fileDescriptor, threadedArgs->hexChunk, threadedArgs->messageSize, threadedArgs->httpHeader, threadedArgs->socketAddress, threadedArgs->addressLen);
+    printf("Ending new thread");
 }
 
 //SERVER METHODS END
@@ -577,7 +599,6 @@ int main(int argc, char **argv, char **envp)
     char *message;              //body message
     int nread;
     int i;
-
     struct sockaddr_in socketAddress;
 
     memset((char *)&socketAddress, '\0', sizeof socketAddress.sin_zero);
@@ -610,6 +631,7 @@ int main(int argc, char **argv, char **envp)
         perror("Error while binding the socket");
         exiting = 0;
     }
+
     int backlog = 100000000;                   //number of queued operations allowed
     errorNo = listen(fileDescriptor, backlog); //Creates the listener on the socket
 
@@ -625,6 +647,7 @@ int main(int argc, char **argv, char **envp)
         perror("Try again later\n");
         return -1;
     }
+
     int nextSocket; //socket that will be used in each acceptance of a request
 
     logFilePath = getLogPathFromConfigFile();
@@ -644,10 +667,16 @@ int main(int argc, char **argv, char **envp)
     {
         log_stream = stdout;
     }
-
+    struct timeval tv;
+    fd_set fset;
+    FD_ZERO(&fset);
+    FD_SET(fileDescriptor, &fset);
+    tv.tv_sec = 30;
+    tv.tv_usec = 0;
     /* Never ending loop of server */
     while (running == 1)
     {
+
         /* Debug print */
         stamp();
         int ret = fprintf(log_stream, "%s:Waiting for next item\n", timestamp);
@@ -669,29 +698,37 @@ int main(int argc, char **argv, char **envp)
 
         PTHREAD myThread;
         int iret;
-        errorNo = (nextSocket = accept(fileDescriptor, (struct sockaddr *)&socketAddress, &address_len));
-        if (errorNo == -1)
+
+        arguments.nextSocket = 0;
+        arguments.hexChunk = hexChunk;
+        arguments.messageSize = messageSize;
+        arguments.httpHeader = httpHeader;
+        arguments.fileDescriptor = fileDescriptor;
+        arguments.socketAddress = socketAddress;
+        arguments.addressLen = address_len;
+
+        printf("Waiting for connection\n");
+        int fd = select(fileDescriptor + 1, &fset, NULL, NULL, &tv);
+        printf("There are %d connection needed\n", fd);
+        if (fd > 0)
         {
-            stamp();
-            fprintf(log_stream, "%s:Error while accepting next item on the queue\n", timestamp);
-            exiting = 0;
+            printf("Ready to connect\n");
+            iret = pthread_create(&myThread, NULL, threadedResponse, (void *)&arguments);
+            pthread_detach(myThread);
+        }
+        else if (fd == 0)
+        {
+            printf("No connection in the timeframe\n");
         }
         else
         {
-            int *newSocket = malloc(sizeof(int));
-            *newSocket = nextSocket;
-
-            arguments.nextSocket = *newSocket;
-            arguments.hexChunk = hexChunk;
-            arguments.messageSize = messageSize;
-            arguments.httpHeader = httpHeader;
-            iret = pthread_create(&myThread, NULL, threadedResponse, (void *)&arguments);
+            printf("Error happened");
         }
-
-        pthread_detach(myThread);
+        tv.tv_sec = 30;
+        tv.tv_usec = 0;
+        FD_ZERO(&fset);
+        FD_SET(fileDescriptor, &fset);
         exiting = 1;
-        sleep(delay);
-        close(nextSocket);
     }
 
     return EXIT_SUCCESS;
